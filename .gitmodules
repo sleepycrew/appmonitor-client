@@ -1,0 +1,3 @@
+[submodule "third_party/appmonitor-schema"]
+	path = third_party/appmonitor-schema
+	url = https://github.com/sleepycrew/appmonitor-schema.git
