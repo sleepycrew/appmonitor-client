@@ -3,7 +3,6 @@ package check
 import (
 	. "github.com/sleepycrew/appmonitor-client/pkg/data"
 	. "github.com/sleepycrew/appmonitor-client/pkg/data/result"
-	"time"
 )
 
 type Checksuite interface {
@@ -69,17 +68,13 @@ func (s TreeChecksuite) RunChecks() ([]ClientCheck, Result) {
 	for _, channel := range channels {
 		for check := range channel {
 			results = append(results, check)
-			//println(check.Name)
 		}
 	}
 
-	println("hey2")
 	return results, Unknown
 }
 
 func evaluateTree(node *checkTreeNode, parentSuccess bool, parentName *string, result chan<- ClientCheck) {
-	time.Sleep(2 * time.Second)
-	println(node.Value.GetName())
 	defer close(result)
 	if !parentSuccess {
 		result <- ClientCheck{
@@ -116,77 +111,6 @@ func evaluateTree(node *checkTreeNode, parentSuccess bool, parentName *string, r
 
 	result <- check
 }
-
-/**
-whole big mess :<
-
-what needs to be done in easy words ->
-
-func evaluateTree(node *checkTreeNode, parentSuccess bool, parentName *string, result chan<- ClientCheck) {
-	if !parentSuccess {
-		println("===========")
-		println(node.Value.GetName())
-		println(parentName)
-		println("===========")
-		result <- ClientCheck{
-			// handle description
-			Name:   node.Value.GetName(),
-			Time:   0,
-			Parent: *parentName,
-			Result: Unknown,
-		}
-		return
-	}
-	childResults := make(chan ClientCheck, len(node.Children))
-	go collectRuntime(node.Value, childResults)
-
-	res := <-childResults
-	for _, child := range node.Children {
-		go evaluateTree(child, res.Result != Error, &res.Name, childResults)
-	}
-	if res.Result == Error {
-		// early return nyan
-		result <- res
-		return
-	}
-
-	for range node.Children {
-		childRes := <-childResults
-		childRes.Parent = res.Name
-		println("child: ", childRes.Name)
-		result <- childRes
-	}
-
-	println("res: ", res.Name)
-	result <- res
-}
-
-
-func evaluateTree(node *checkTreeNode, parentSuccess bool, result chan<- ClientCheck) {
-	if !parentSuccess {
-		result <- ClientCheck{
-			// handle description
-			Name: node.Value.GetName(),
-			Time: 0,
-			//Parent: *parentName,
-			Result: Unknown,
-		}
-		return
-	}
-	childResults := make(chan ClientCheck, len(node.Children))
-	for _, child := range node.Children {
-		go evaluateTree(child, true, childResults)
-	}
-	go node.Value.RunCheck(childResults)
-	check := <-childResults
-	for range node.Children {
-		var childCheck = <-childResults
-		result <- childCheck
-	}
-	result <- check
-}
-
-*/
 
 func NewCheckSuite() Checksuite {
 	return ParallelChecksuite{checks: make(map[string]Check)}

@@ -1,9 +1,10 @@
 package check
 
 import (
-	"github.com/sleepycrew/appmonitor-client/pkg/data"
 	"sync"
 	"time"
+
+	"github.com/sleepycrew/appmonitor-client/pkg/data"
 )
 
 type Check interface {
@@ -16,12 +17,10 @@ type Check interface {
 // creating a channel is probably costly?
 func collectRuntime(check Check, result chan<- data.ClientCheck) {
 	c := make(chan data.ClientCheck)
-	//println("start", check.GetName())
 	start := time.Now()
 	go check.RunCheck(c)
 	tempRes := <-c
 	elapsed := time.Since(start).Milliseconds()
-	//println("stop", check.GetName())
 	tempRes.Time = float64(elapsed)
 	result <- tempRes
 }
