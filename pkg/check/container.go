@@ -1,6 +1,6 @@
 package check
 
 type CheckContainer interface {
-	AddCheck(check Check)
-	AddNestedCheck(parent *string, check Check)
+	AddCheck(metadata Metadata, check Check)
+	AddNestedCheck(parent *string, metadata Metadata, check Check)
 }

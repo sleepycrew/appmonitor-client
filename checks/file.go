@@ -3,8 +3,8 @@ package checks
 import (
 	"errors"
 	"fmt"
-	"github.com/sleepycrew/appmonitor-client/pkg/data"
-	. "github.com/sleepycrew/appmonitor-client/pkg/data/result"
+	"github.com/sleepycrew/appmonitor-client/pkg/check"
+	"github.com/sleepycrew/appmonitor-client/pkg/data/result"
 	"io/fs"
 	"os"
 )
@@ -18,28 +18,18 @@ type FileCheckSettings struct {
 }
 
 type FileCheck struct {
-	name        string
-	description string
-	filePath    string
-	settings    FileCheckSettings
+	filePath string
+	settings FileCheckSettings
 }
 
-func (c FileCheck) GetName() string {
-	return c.name
-}
-
-func (c FileCheck) GetDescription() *string {
-	return &c.description
-}
-
-type fileCheckMapping = func(settings FileCheckSettings, info os.FileInfo) (Result, string)
+type fileCheckMapping = func(settings FileCheckSettings, info os.FileInfo) (result.Code, string)
 
 func wrapFileCheckMapping(name string, fun func(settings FileCheckSettings, info os.FileInfo) bool) fileCheckMapping {
-	return func(settings FileCheckSettings, info os.FileInfo) (Result, string) {
+	return func(settings FileCheckSettings, info os.FileInfo) (result.Code, string) {
 		if fun(settings, info) {
-			return OK, name
+			return result.OK, name
 		} else {
-			return Error, name
+			return result.Error, name
 		}
 	}
 }
@@ -54,9 +44,9 @@ var fileCheckMappings = []fileCheckMapping{
 	}),
 }
 
-func (c FileCheck) checkFile() (Result, string) {
+func (c FileCheck) checkFile() (result.Code, string) {
 	if fs.ValidPath(c.filePath) {
-		return Unknown, "path is invalid"
+		return result.Unknown, "path is invalid"
 	}
 
 	stat, err := os.Stat(c.filePath)
@@ -64,38 +54,34 @@ func (c FileCheck) checkFile() (Result, string) {
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			if !c.settings.Exists {
-				return OK, "File does not exists"
+				return result.OK, "File does not exists"
 			}
 		}
 
-		return Unknown, fmt.Sprint("could not get file statistics: %i", err)
+		return result.Unknown, fmt.Sprint("could not get file statistics: %i", err)
 	}
 
 	for _, mapping := range fileCheckMappings {
-		result, name := mapping(c.settings, stat)
-		if result != OK {
-			return Error, fmt.Sprintf("file does not meet requirement: %s", name)
+		res, name := mapping(c.settings, stat)
+		if res != result.OK {
+			return result.Error, fmt.Sprintf("file does not meet requirement: %s", name)
 		}
 	}
 
-	return OK, "File exists and meets requirements"
+	return result.OK, "File exists and meets requirements"
 }
 
-func (c FileCheck) RunCheck(results chan<- data.ClientCheck) {
+func (c FileCheck) RunCheck(output chan<- check.Result) {
 	result, value := c.checkFile()
 
-	results <- data.ClientCheck{
-		Name:        c.GetName(),
-		Value:       value,
-		Description: c.description,
-		Result:      int(result),
+	output <- check.Result{
+		Value:  value,
+		Result: result,
 	}
 }
 
-func NewFileCheck(name string, description string, filePath string, settings FileCheckSettings) FileCheck {
+func NewFileCheck(filePath string, settings FileCheckSettings) FileCheck {
 	return FileCheck{
-		name,
-		description,
 		filePath,
 		settings,
 	}

@@ -3,6 +3,7 @@ package main
 import (
 	. "github.com/sleepycrew/appmonitor-client"
 	"github.com/sleepycrew/appmonitor-client/checks"
+	"github.com/sleepycrew/appmonitor-client/pkg/check"
 	"github.com/sleepycrew/appmonitor-client/pkg/monitor"
 )
 
@@ -12,7 +13,7 @@ func main() {
 		Website: "http://127.0.0.1",
 		Ttl:     20,
 	})
-	myCheck := checks.StaticCheck{Name: "StaticCheck", Value: "Hewwo Wowld"}
-	myMonitor.AddCheck(myCheck)
+	myCheck := checks.StaticCheck{Value: "Hewwo Wowld"}
+	myMonitor.AddCheck(check.Metadata{Name: "StaticCheck"}, myCheck)
 	myMonitor.RunCmd()
 }

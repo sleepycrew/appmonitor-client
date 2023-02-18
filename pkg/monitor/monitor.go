@@ -59,12 +59,12 @@ func (m Monitor) GetName() string {
 	return m.name
 }
 
-func (m *Monitor) AddCheck(c check.Check) {
-	m.checkSuite.AddCheck(c)
+func (m *Monitor) AddCheck(meta check.Metadata, c check.Check) {
+	m.checkSuite.AddCheck(meta, c)
 }
 
-func (m *Monitor) AddNestedCheck(parent *string, c check.Check) {
-	m.checkSuite.AddNestedCheck(parent, c)
+func (m *Monitor) AddNestedCheck(parent *string, meta check.Metadata, c check.Check) {
+	m.checkSuite.AddNestedCheck(parent, meta, c)
 }
 
 func NewMonitor(meta MonitorMetadata) Monitor {

@@ -1,6 +1,7 @@
 package check
 
 import (
+	"github.com/sleepycrew/appmonitor-client/pkg/data/result"
 	"sync"
 	"time"
 
@@ -8,21 +9,33 @@ import (
 )
 
 type Check interface {
-	GetName() string
-	GetDescription() *string
-	RunCheck(result chan<- data.ClientCheck)
+	RunCheck(result chan<- Result)
+}
+
+type Result struct {
+	Result result.Code
+	Value  string
+}
+
+type Metadata struct {
+	Name        string
+	Description string
 }
 
 // Runs a check and sets the Time field based on execution time
 // creating a channel is probably costly?
 func collectRuntime(check Check, result chan<- data.ClientCheck) {
-	c := make(chan data.ClientCheck)
+	c := make(chan Result)
 	start := time.Now()
 	go check.RunCheck(c)
-	tempRes := <-c
+	checkResult := <-c
 	elapsed := time.Since(start).Milliseconds()
-	tempRes.Time = float64(elapsed)
-	result <- tempRes
+
+	clientCheck := new(data.ClientCheck)
+	clientCheck.Value = checkResult.Value
+	clientCheck.Result = int(checkResult.Result)
+	clientCheck.Time = float64(elapsed)
+	result <- *clientCheck
 }
 
 type clientCheckResolver = func(result chan<- data.ClientCheck)
@@ -37,6 +50,11 @@ func setParent(parent *string, fun clientCheckResolver, result chan<- data.Clien
 	} else {
 		go fun(result)
 	}
+}
+
+func setMetadata(cc *data.ClientCheck, metadata Metadata) {
+	cc.Name = metadata.Name
+	cc.Description = metadata.Description
 }
 
 func merge(cs ...<-chan data.ClientCheck) <-chan data.ClientCheck {
@@ -59,4 +77,11 @@ func merge(cs ...<-chan data.ClientCheck) <-chan data.ClientCheck {
 		close(out)
 	}()
 	return out
+}
+
+// Parent
+// converts a string to a pointer to make AddCheck calls bearable
+// why is go like this ? :(
+func Parent(s string) *string {
+	return &s
 }

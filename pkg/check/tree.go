@@ -3,7 +3,6 @@ package check
 type checkTree struct {
 	// cache of all names of the checks inside the tree
 	checkNames map[string]bool
-	value      Check
 	children   []*checkTreeNode
 }
 
@@ -18,8 +17,8 @@ func (c *checkTree) FindByName(name string) *checkTreeNode {
 	return nil
 }
 
-func (c *checkTree) AddCheck(parent *string, check Check) int {
-	checkName := check.GetName()
+func (c *checkTree) AddCheck(parent *string, metadata Metadata, check Check) int {
+	checkName := metadata.Name
 
 	if c.checkNames[checkName] {
 		// duplicate
@@ -35,11 +34,13 @@ func (c *checkTree) AddCheck(parent *string, check Check) int {
 		p := c.FindByName(*parent)
 		p.Children = append(p.Children, &checkTreeNode{
 			Value:    check,
+			Metadata: metadata,
 			Children: make([]*checkTreeNode, 0),
 		})
 	} else {
 		c.children = append(c.children, &checkTreeNode{
 			Value:    check,
+			Metadata: metadata,
 			Children: make([]*checkTreeNode, 0),
 		})
 	}
@@ -58,11 +59,12 @@ func (c checkTree) Size() int {
 
 type checkTreeNode struct {
 	Value    Check
+	Metadata Metadata
 	Children []*checkTreeNode
 }
 
 func (c *checkTreeNode) FindByName(name string) *checkTreeNode {
-	if c.Value.GetName() == name {
+	if c.Metadata.Name == name {
 		return c
 	}
 

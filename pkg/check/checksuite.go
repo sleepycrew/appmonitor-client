@@ -2,21 +2,22 @@ package check
 
 import (
 	. "github.com/sleepycrew/appmonitor-client/pkg/data"
-	. "github.com/sleepycrew/appmonitor-client/pkg/data/result"
+	"github.com/sleepycrew/appmonitor-client/pkg/data/result"
 )
 
 type Checksuite interface {
-	RunChecks() ([]ClientCheck, Result)
-	AddCheck(check Check)
-	AddNestedCheck(parent *string, check Check)
+	RunChecks() ([]ClientCheck, result.Code)
+	AddCheck(metadata Metadata, check Check)
+	AddNestedCheck(parent *string, metadata Metadata, check Check)
 }
 
 // ParallelChecksuite Runs all checks in parallel regardless of hierarchy
 type ParallelChecksuite struct {
-	checks map[string]Check
+	checks   map[string]Check
+	metadata map[string]Metadata
 }
 
-func (s ParallelChecksuite) RunChecks() ([]ClientCheck, Result) {
+func (s ParallelChecksuite) RunChecks() ([]ClientCheck, result.Code) {
 	c := make(chan ClientCheck)
 	count := 0
 
@@ -30,31 +31,31 @@ func (s ParallelChecksuite) RunChecks() ([]ClientCheck, Result) {
 	for i := range results {
 		results[i] = <-c
 	}
-	return results, Unknown
+	return results, result.Unknown
 }
 
-func (s ParallelChecksuite) AddCheck(check Check) {
-	name := check.GetName()
-	s.checks[name] = check
+func (s ParallelChecksuite) AddCheck(metadata Metadata, check Check) {
+	s.checks[metadata.Name] = check
+	s.metadata[metadata.Name] = metadata
 }
 
-func (s ParallelChecksuite) AddNestedCheck(_ *string, check Check) {
-	s.AddCheck(check)
+func (s ParallelChecksuite) AddNestedCheck(_ *string, metadata Metadata, check Check) {
+	s.AddCheck(metadata, check)
 }
 
 type TreeChecksuite struct {
 	tree *checkTree
 }
 
-func (s TreeChecksuite) AddCheck(check Check) {
-	s.tree.AddCheck(nil, check)
+func (s TreeChecksuite) AddCheck(metadata Metadata, check Check) {
+	s.tree.AddCheck(nil, metadata, check)
 }
 
-func (s TreeChecksuite) AddNestedCheck(parent *string, check Check) {
-	s.tree.AddCheck(parent, check)
+func (s TreeChecksuite) AddNestedCheck(parent *string, metadata Metadata, check Check) {
+	s.tree.AddCheck(parent, metadata, check)
 }
 
-func (s TreeChecksuite) RunChecks() ([]ClientCheck, Result) {
+func (s TreeChecksuite) RunChecks() ([]ClientCheck, result.Code) {
 	size := s.tree.Size()
 	println("tree size: ", size)
 
@@ -71,19 +72,19 @@ func (s TreeChecksuite) RunChecks() ([]ClientCheck, Result) {
 		}
 	}
 
-	return results, Unknown
+	return results, result.Unknown
 }
 
-func evaluateTree(node *checkTreeNode, parentSuccess bool, parentName *string, result chan<- ClientCheck) {
-	defer close(result)
+func evaluateTree(node *checkTreeNode, parentSuccess bool, parentName *string, res chan<- ClientCheck) {
+	defer close(res)
 	if !parentSuccess {
-		result <- ClientCheck{
+		res <- ClientCheck{
 			// handle description
-			Name: node.Value.GetName(),
+			Name: node.Metadata.Name,
 			Time: 0,
 			// assume that parent is not nil, first call must use parentSuccess = true anyway
 			Parent: *parentName,
-			Result: Unknown,
+			Result: result.Unknown,
 			Value:  "Parent Failed.",
 		}
 		return
@@ -94,22 +95,23 @@ func evaluateTree(node *checkTreeNode, parentSuccess bool, parentName *string, r
 		go collectRuntime(node.Value, r)
 	}, c)
 	check := <-c
+	setMetadata(&check, node.Metadata)
 	close(c)
 
 	channels := make([]<-chan ClientCheck, 0)
 
 	for _, child := range node.Children {
-		nodeName := node.Value.GetName()
+		nodeName := node.Metadata.Name
 		channel := make(chan ClientCheck)
 		channels = append(channels, channel)
-		go evaluateTree(child, check.Result != Error, &nodeName, channel)
+		go evaluateTree(child, check.Result != result.Error, &nodeName, channel)
 	}
 
 	for childCheck := range merge(channels...) {
-		result <- childCheck
+		res <- childCheck
 	}
 
-	result <- check
+	res <- check
 }
 
 func NewCheckSuite() Checksuite {
@@ -117,5 +119,5 @@ func NewCheckSuite() Checksuite {
 }
 
 func NewCheckTreeSuite() Checksuite {
-	return TreeChecksuite{tree: &checkTree{checkNames: map[string]bool{}, children: make([]*checkTreeNode, 0), value: nil}}
+	return TreeChecksuite{tree: &checkTree{checkNames: map[string]bool{}, children: make([]*checkTreeNode, 0)}}
 }
